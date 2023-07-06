@@ -8,7 +8,7 @@
 bin/blackwater subcommand[init|auctions|realms|com] [flags]
 ```
 
-If a subcommand has flags:
+Use the help flag `-h` to see if a subcommand has flags:
 ```Bash
 bin/blackwater subcommand[init|auctions|realms|com] -h
 ```
