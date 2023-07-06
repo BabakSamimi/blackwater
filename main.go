@@ -32,17 +32,22 @@ func main() {
 	log.SetOutput(f)
 	defer f.Close()
 
-	if len(os.Args) < 2 {
-		fmt.Println("Expected subcommands realms, auctions or commodities")
-		//os.Exit(1)
-	}
-
 	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
 	initSql := initCmd.Bool("sql", false, "Sets up the database if it doesn't exist, using sqllite3.")
+	//realmsCmd := flag.NewFlagSet("realms", flag.ExitOnError)
+	//auctionsCmd := flag.NewFlagSet("auctions", flag.ExitOnError)
+	//comCmd := flag.NewFlagSet("commodities", flag.ExitOnError)
+
+	flag.Parse()
+
+	if len(os.Args) < 2 {
+		fmt.Printf("Expected: blackwater [realms|auctions|com] [flags]\n")
+		os.Exit(1)
+	}
 
 	if os.Args[1] == "init" {
 		initCmd.Parse(os.Args[2:])
-		log.Println("Creating all neccessary folders.")
+		log.Println("Creating all asdasdneccessary folders.")
 
 		os.Mkdir(auctionsFolder, os.ModeAppend)
 		os.Mkdir(auctionsFolder+"/eu", os.ModeAppend)
@@ -59,10 +64,7 @@ func main() {
 
 		os.Exit(0)
 	}
-
-	//realmsCmd := flag.NewFlagSet("realms", flag.ExitOnError)
-	//auctionsCmd := flag.NewFlagSet("auctions", flag.ExitOnError)
-	//comCmd := flag.NewFlagSet("commodities", flag.ExitOnError)
+	fmt.Printf("Usage:\n\tblackwater [realms|auctions|commodities] [flags]\n")
 
 	api, apiCreationError := blackwater.NewAPI(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"))
 	if apiCreationError != nil {
@@ -123,7 +125,9 @@ func main() {
 		api.SetRegion(blackwater.US, blackwater.EnUS)
 		blackwater.FetchCommoditiesAndSaveToDisk(comFolder+"/us", api)
 		log.Println("Fetching commodities for US done.")
-
+	default:
+		fmt.Printf("Expected: blackwater [realms|auctions|commodities] [flags]\n")
+		os.Exit(1)
 	}
 
 }
