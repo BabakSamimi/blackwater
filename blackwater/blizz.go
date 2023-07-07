@@ -108,7 +108,7 @@ func (api *API) SetRegion(region Region, locale Locale) {
 	api.locale = locale
 }
 
-func (api *API) GetstaticNamespace() Namespace {
+func (api *API) GetStaticNamespace() Namespace {
 	switch api.region {
 	case EU:
 		return StaticEU
@@ -130,12 +130,22 @@ func (api *API) GetDynamicNamespace() Namespace {
 	}
 }
 
-func (api *API) buildUrl(endpoint string) string {
+func (api *API) buildUrlDynamic(endpoint string) string {
 	return fmt.Sprintf(
 		"https://%s.api.blizzard.com/%s?namespace=%s&locale=%s&access_token=%s",
 		api.region,
 		endpoint,
 		api.GetDynamicNamespace(),
+		api.locale,
+		api.User.Token.AccessToken)
+}
+
+func (api *API) buildUrlStatic(endpoint string) string {
+	return fmt.Sprintf(
+		"https://%s.api.blizzard.com/%s?namespace=%s&locale=%s&access_token=%s",
+		api.region,
+		endpoint,
+		api.GetStaticNamespace(),
 		api.locale,
 		api.User.Token.AccessToken)
 }
@@ -270,7 +280,7 @@ func (api *API) fetchDataCompressed(u string) (*fasthttp.Response, error) {
 func (api *API) ConnectedRealmsIndex() (*fasthttp.Response, error) {
 
 	res, err := api.fetchData(
-		api.buildUrl("data/wow/connected-realm/index"))
+		api.buildUrlDynamic("data/wow/connected-realm/index"))
 
 	return res, err
 
@@ -279,7 +289,7 @@ func (api *API) ConnectedRealmsIndex() (*fasthttp.Response, error) {
 func (api *API) ConnectedRealm(connectedRealmID int) (*fasthttp.Response, error) {
 
 	res, err := api.fetchData(
-		api.buildUrl(fmt.Sprintf("data/wow/connected-realm/%d", connectedRealmID)))
+		api.buildUrlDynamic(fmt.Sprintf("data/wow/connected-realm/%d", connectedRealmID)))
 
 	return res, err
 
@@ -288,7 +298,7 @@ func (api *API) ConnectedRealm(connectedRealmID int) (*fasthttp.Response, error)
 func (api *API) Auctions(connectedRealmID int) (*fasthttp.Response, error) {
 
 	res, err := api.fetchDataCompressed(
-		api.buildUrl(fmt.Sprintf("data/wow/connected-realm/%d/auctions", connectedRealmID)))
+		api.buildUrlDynamic(fmt.Sprintf("data/wow/connected-realm/%d/auctions", connectedRealmID)))
 
 	return res, err
 
@@ -297,7 +307,7 @@ func (api *API) Auctions(connectedRealmID int) (*fasthttp.Response, error) {
 func (api *API) Commodities() (*fasthttp.Response, error) {
 
 	res, err := api.fetchDataCompressed(
-		api.buildUrl("data/wow/auctions/commodities"))
+		api.buildUrlDynamic("data/wow/auctions/commodities"))
 
 	return res, err
 
