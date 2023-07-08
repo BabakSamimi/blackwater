@@ -11,8 +11,10 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func FetchAuctionsAndSaveToDisk(folder string, realmFolder string, api *API) {
+func FetchAuctionsAndSaveToDisk(r Region, folder string, realmFolder string, api *API) {
 
+	// Get all connected realms
+	realmFolder = realmFolder + "/" + string(r)
 	files, err := ioutil.ReadDir(realmFolder)
 	if err != nil {
 		log.Printf("%q", err)
@@ -29,9 +31,9 @@ func FetchAuctionsAndSaveToDisk(folder string, realmFolder string, api *API) {
 			continue
 		}
 
-		// Create the AH folder for the realm
-		auctionFolder := folder + "/" + basename
-		os.Mkdir(auctionFolder, os.ModeAppend)
+		// Create the AH folder for the specific realm
+		auctionFolder := folder + "/" + string(r) + "/" + basename
+		os.MkdirAll(auctionFolder, 0777)
 
 		res, err := api.Auctions(connectedRealmIndex)
 		defer fasthttp.ReleaseResponse(res)
@@ -41,6 +43,8 @@ func FetchAuctionsAndSaveToDisk(folder string, realmFolder string, api *API) {
 			continue
 		}
 
+		// The header has a "Last-Modified" field which we will use
+		// to see if the file is already on disk or not
 		lastModified := b2s(res.Header.Peek("Last-Modified"))
 		timestamp, err := time.Parse("Mon, _2 Jan 2006 15:04:05 MST", lastModified)
 		if err != nil {
@@ -76,7 +80,7 @@ func FetchAuctionsAndSaveToDisk(folder string, realmFolder string, api *API) {
 
 }
 
-func FetchCommoditiesAndSaveToDisk(folder string, api *API) {
+func FetchCommoditiesAndSaveToDisk(r Region, folder string, api *API) {
 
 	res, err := api.Commodities()
 	defer fasthttp.ReleaseResponse(res)
@@ -86,6 +90,8 @@ func FetchCommoditiesAndSaveToDisk(folder string, api *API) {
 		return
 	}
 
+	// The header has a "Last-Modified" field which we will use
+	// to see if the file is already on disk or not
 	lastModified := b2s(res.Header.Peek("Last-Modified"))
 	timestamp, err := time.Parse("Mon, _2 Jan 2006 15:04:05 MST", lastModified)
 	if err != nil {
@@ -100,7 +106,7 @@ func FetchCommoditiesAndSaveToDisk(folder string, api *API) {
 	}
 
 	// If timestamp doesn't exist, save auction to disk
-	fullPath := folder + "/" + timestampUnix + ".json.gz"
+	fullPath := folder + "/" + string(r) + "/" + timestampUnix + ".json.gz"
 	if _, err := os.Stat(fullPath); !os.IsNotExist(err) {
 		log.Printf("%s already exists!", fullPath)
 		return

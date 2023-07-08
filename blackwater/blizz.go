@@ -4,18 +4,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/valyala/fasthttp"
-	"golang.org/x/oauth2"
 )
+
+type Token struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in,omitempty"`
+}
 
 type Client struct {
 	ID     string
 	Secret string
-	Token  *oauth2.Token
+
+	Token *Token
 }
 
 type Region string
@@ -51,6 +58,41 @@ func NewAPI(clientID string, clientSecret string) (api *API, err error) {
 		}).Dial,
 	}
 
+	// Check if token is cached or if it needs to be refreshed
+	f, err := os.OpenFile("blackwater.oauth", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	log.Println("Reading from oauth file to see if there is a cached token")
+	fileBuffer, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(fileBuffer) > 1 {
+
+		err = json.Unmarshal(fileBuffer, &api.User.Token)
+		if err == nil {
+			log.Println("Found a cached oauth token")
+
+			tokenExpiration := time.Unix(int64(api.User.Token.ExpiresIn), 0)
+			nowUnix := time.Now().Unix()
+
+			// Add a margin of 10 seconds, in case we are unlucky
+			// and we try to fetch with an expired token
+
+			if nowUnix < (tokenExpiration.Unix() + 10) {
+				log.Println("Token has not yet expired")
+				log.Println("Token will expire:", tokenExpiration)
+				return api, nil
+			}
+		}
+	}
+
+	log.Println("Found no token or it expired or something went wrong. Fetching a new token")
+
 	req := fasthttp.AcquireRequest()
 	url := fasthttp.AcquireURI()
 
@@ -76,6 +118,16 @@ func NewAPI(clientID string, clientSecret string) (api *API, err error) {
 	err = json.Unmarshal(res.Body(), &api.User.Token)
 	fasthttp.ReleaseResponse(res)
 
+	if err != nil {
+		return nil, err
+	}
+
+	api.User.Token.ExpiresIn += int(time.Now().Unix())
+
+	log.Println("Newly fetched oauth token will expire at:", time.Unix(int64(api.User.Token.ExpiresIn), 0))
+
+	j, _ := json.Marshal(api.User.Token)
+	_, err = f.Write(j)
 	if err != nil {
 		return nil, err
 	}

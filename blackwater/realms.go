@@ -13,7 +13,8 @@ import (
 )
 
 // To be more specific; fetch connected realms and save them as json files on disk.
-func FetchRealmsAndSaveToDisk(folder string, api *API) {
+func FetchRealmsAndSaveToDisk(r Region, folder string, api *API) {
+	api.SetRegion(r, EnUS)
 	res, err := api.ConnectedRealmsIndex()
 	if err != nil {
 		log.Println(err)
@@ -54,7 +55,7 @@ func FetchRealmsAndSaveToDisk(folder string, api *API) {
 		// Create data on the connected realm and its sub-realms
 		// and save it on the disk
 
-		fileName := fmt.Sprintf("%s/%d.json", folder, connectedRealmIndex)
+		fileName := fmt.Sprintf("%s/%s/%d.json", folder, r, connectedRealmIndex)
 		f, err := os.Create(fileName)
 
 		if err != nil {

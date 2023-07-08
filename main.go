@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"samimi/blackwater/blackwater"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func FileExists(p string) error {
@@ -17,6 +19,8 @@ func FileExists(p string) error {
 }
 
 const (
+	databaseFolder = "data/db"
+	databaseFile   = databaseFolder + "/bw.db" // This is where all the data will go
 	auctionsFolder = "data/auctions"
 	realmFolder    = "data/connectedrealms"
 	comFolder      = "data/commodities"
@@ -34,97 +38,116 @@ func main() {
 
 	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
 	initSql := initCmd.Bool("sql", false, "Sets up the database if it doesn't exist, using sqllite3.")
-	//realmsCmd := flag.NewFlagSet("realms", flag.ExitOnError)
-	//auctionsCmd := flag.NewFlagSet("auctions", flag.ExitOnError)
-	//comCmd := flag.NewFlagSet("commodities", flag.ExitOnError)
+
+	realmsCmd := flag.NewFlagSet("realms", flag.ExitOnError)
+	euRealms := realmsCmd.Bool("eu", false, "Fetches EU realm indices.")
+	usRealms := realmsCmd.Bool("us", false, "Fetches US realm indices.")
+
+	auctionsCmd := flag.NewFlagSet("auctions", flag.ExitOnError)
+	euAuctions := auctionsCmd.Bool("eu", false, "Fetches auctions from EU.")
+	usAuctions := auctionsCmd.Bool("us", false, "Fetches auctions from US.")
+
+	comCmd := flag.NewFlagSet("commodities", flag.ExitOnError)
+	euComs := comCmd.Bool("eu", false, "Fetches commoditiy auctions from EU.")
+	usComs := comCmd.Bool("us", false, "Fetches commoditiy auctions from US.")
 
 	flag.Parse()
 
 	if len(os.Args) < 2 {
-		fmt.Printf("Expected: blackwater [realms|auctions|com] [flags]\n")
+		fmt.Println("Expected: blackwater [init|realms|auctions|com] [flags]")
 		os.Exit(1)
 	}
 
+	os.Mkdir("data", 0777)
+
 	if os.Args[1] == "init" {
 		initCmd.Parse(os.Args[2:])
-		log.Println("Creating all asdasdneccessary folders.")
+		log.Println("Creating all neccessary folders.")
 
-		os.Mkdir(auctionsFolder, os.ModeAppend)
-		os.Mkdir(auctionsFolder+"/eu", os.ModeAppend)
-		os.Mkdir(auctionsFolder+"/us", os.ModeAppend)
-		os.Mkdir(comFolder+"/eu", os.ModeAppend)
-		os.Mkdir(comFolder+"/us", os.ModeAppend)
-		os.Mkdir(realmFolder+"/eu", os.ModeAppend)
-		os.Mkdir(realmFolder+"/us", os.ModeAppend)
+		os.MkdirAll(auctionsFolder+"/eu", 0777)
+		os.Mkdir(auctionsFolder+"/us", 0777)
+
+		os.MkdirAll(comFolder+"/eu", 0777)
+		os.MkdirAll(comFolder+"/us", 0777)
+
+		os.MkdirAll(realmFolder+"/eu", 0777)
+		os.MkdirAll(realmFolder+"/us", 0777)
 
 		// TODO: SQL init
 		if *initSql {
-			log.Println("Setting up SQLLite3 DB.")
+			err = blackwater.InitDB(databaseFile)
+
+			if err != nil {
+				log.Print(err)
+			}
+
 		}
 
 		os.Exit(0)
 	}
-	fmt.Printf("Usage:\n\tblackwater [realms|auctions|commodities] [flags]\n")
+	//fmt.Printf("Usage:\n\tblackwater [realms|auctions|commodities] [flags]\n")
 
 	api, apiCreationError := blackwater.NewAPI(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"))
 	if apiCreationError != nil {
 		log.Fatal(apiCreationError)
 	}
 
-	fmt.Println("Successfully fetched an Oauth token.")
-
-	os.Mkdir("data", os.ModeAppend)
+	log.Println("Successfully created an API client.")
 
 	switch os.Args[1] {
 	case "realms":
+		realmsCmd.Parse(os.Args[2:])
 		// Fetch realm data
 		log.Println("Fetching realm data")
 
-		os.Mkdir(realmFolder, os.ModeAppend)
-		os.Mkdir(realmFolder+"/eu", os.ModeAppend)
-		os.Mkdir(realmFolder+"/us", os.ModeAppend)
+		os.MkdirAll(realmFolder+"/eu", 0777)
+		os.MkdirAll(realmFolder+"/us", 0777)
 
-		log.Println("Fetching connected realm indices for EU.")
-		api.SetRegion(blackwater.EU, blackwater.EnUS)
-		blackwater.FetchRealmsAndSaveToDisk(realmFolder+"/eu", api)
-		log.Println("Fetching connected realm indices for EU done.")
+		if *euRealms {
+			log.Println("Fetching connected realm indices for EU.")
+			blackwater.FetchRealmsAndSaveToDisk(blackwater.EU, realmFolder, api)
+			log.Println("Fetching connected realm indices for EU done.")
+		}
 
-		log.Println("Fetching connected realm indices for US.")
-		api.SetRegion(blackwater.US, blackwater.EnUS)
-		blackwater.FetchRealmsAndSaveToDisk(realmFolder+"/us", api)
-		log.Println("Fetching connected realm indices for US done.")
-
+		if *usRealms {
+			log.Println("Fetching connected realm indices for US.")
+			blackwater.FetchRealmsAndSaveToDisk(blackwater.US, realmFolder, api)
+			log.Println("Fetching connected realm indices for US done.")
+		}
 	case "auctions":
 		// Fetch auctions for all connected realms in us and eu
-		os.Mkdir(auctionsFolder, os.ModeAppend)
-		os.Mkdir(auctionsFolder+"/eu", os.ModeAppend)
-		os.Mkdir(auctionsFolder+"/us", os.ModeAppend)
+		os.MkdirAll(auctionsFolder+"/eu", 0777)
+		os.MkdirAll(auctionsFolder+"/us", 0777)
 
-		log.Println("Fetching auctions for EU realms.")
-		api.SetRegion(blackwater.EU, blackwater.EnUS)
-		blackwater.FetchAuctionsAndSaveToDisk(auctionsFolder+"/eu", realmFolder+"/eu", api)
-		log.Println("Fetching of auctions for US realms done.")
+		if *euAuctions {
+			log.Println("Fetching auctions for EU realms.")
+			blackwater.FetchAuctionsAndSaveToDisk(blackwater.EU, auctionsFolder, realmFolder, api)
+			log.Println("Fetching of auctions for US realms done.")
+		}
 
-		log.Println("Fetching auctions for US realms.")
-		api.SetRegion(blackwater.US, blackwater.EnUS)
-		blackwater.FetchAuctionsAndSaveToDisk(auctionsFolder+"/us", realmFolder+"/us", api)
-		log.Println("Fetching of auctions for US realms done.")
+		if *usAuctions {
+			log.Println("Fetching auctions for US realms.")
+			blackwater.FetchAuctionsAndSaveToDisk(blackwater.US, auctionsFolder, realmFolder, api)
+			log.Println("Fetching of auctions for US realms done.")
+		}
 
 	case "com":
 		// Fetch commodities for eu and us
-		os.Mkdir(comFolder, os.ModeAppend)
-		os.Mkdir(comFolder+"/eu", os.ModeAppend)
-		os.Mkdir(comFolder+"/us", os.ModeAppend)
+		os.MkdirAll(comFolder+"/eu", 0777)
+		os.MkdirAll(comFolder+"/us", 0777)
 
-		log.Println("Fetching commodities for EU.")
-		api.SetRegion(blackwater.EU, blackwater.EnUS)
-		blackwater.FetchCommoditiesAndSaveToDisk(comFolder+"/eu", api)
-		log.Println("Fetching commodities for EU done.")
+		if *euComs {
+			log.Println("Fetching commodities for EU.")
+			blackwater.FetchCommoditiesAndSaveToDisk(blackwater.EU, comFolder, api)
+			log.Println("Fetching commodities for EU done.")
+		}
 
-		log.Println("Fetching commodities for US.")
-		api.SetRegion(blackwater.US, blackwater.EnUS)
-		blackwater.FetchCommoditiesAndSaveToDisk(comFolder+"/us", api)
-		log.Println("Fetching commodities for US done.")
+		if *usComs {
+			log.Println("Fetching commodities for US.")
+			blackwater.FetchCommoditiesAndSaveToDisk(blackwater.US, comFolder, api)
+			log.Println("Fetching commodities for US done.")
+		}
+
 	default:
 		fmt.Printf("Expected: blackwater [realms|auctions|commodities] [flags]\n")
 		os.Exit(1)
